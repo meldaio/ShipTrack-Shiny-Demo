@@ -3,15 +3,23 @@ library(shiny.semantic)
 library(leaflet)
 library(dplyr)
 
-data <- read.csv("ships.csv", nrows = 50)
-head(data)
+memdata = reactiveValues(myship = NULL)
+
+if (!exists("shipdata")){
+    if (!file.exists("ships.RData")) {
+        shipdata <- read.csv("ships.csv")
+        save(shipdata, file = "ships.RData")
+    } else {
+        load("ships.RData")
+    }
+}
 
 ui <- shinyUI(semanticPage(
     header(title = "SHIP PROJECT", description = "Description", icon = "ship"),
     sidebar_layout(
         sidebar_panel(
-            dropdown_input("simple_dropdown1", unique(data$ship_type), 
-                           value = data$ship_type[1], type = "selection single"),
+            dropdown_input("simple_dropdown1", unique(shipdata$ship_type), 
+                           value = shipdata$ship_type[1], type = "selection single"),
             uiOutput("simple_dropdown2"),
             width = 4),
         main_panel(
@@ -20,32 +28,43 @@ ui <- shinyUI(semanticPage(
         ),mirrored = TRUE
     ),theme = "solar")
 )
+
 server <- shinyServer(function(input, output) {
+    
     output$mymap <- renderLeaflet({
+        req(memdata$myship)
+
         leaflet() %>%
             addProviderTiles(providers$Stamen.TonerLite,
                              options = providerTileOptions(noWrap = TRUE)
-            )%>%
-            #setView(lng = data$LON[1],lat = data$LAT[1], zoom = 10) %>%
-            addMarkers(data = cbind(data$LAT[1],
-                                    data$LON[1]))
+            ) %>%
+            #setView(lng = shipdata$LON[1],lat = shipdata$LAT[1], zoom = 10) %>%
+            #addMarkers(shipdata = cbind(shipdata$LAT[1], shipdata$LON[1]))
+            addCircleMarkers(data = select(memdata$myship, LAT, LON))
     })
+    
     output$simple_dropdown2 = renderUI({
-        new <- filter(data, data$ship_type==input$simple_dropdown1) %>% as.data.frame()
-        new <- new$SHIPNAME
-        new <- unique(new)
-        dropdown_input("simple_dropdown2", new, 
-                       value = new[1], type = "selection single")
+        shipnames <- dplyr::filter(shipdata, ship_type==input$simple_dropdown1)  %>% 
+            select(SHIPNAME)  %>%  pull() %>%  unique()
+        dropdown_input("simple_dropdown2", shipnames, 
+                       value = shipnames[1], type = "selection single")
     })
+    
     df_filtered <- reactive({
+        req(input$simple_dropdown2)
         cbind(data[data$SHIPNAME == input$simple_dropdown2, ]$LAT[1], 
               data[data$SHIPNAME == input$simple_dropdown2, ]$LON[1])
     })
+
     observe({
-        
-        leafletProxy(mapId = "mymap", data = df_filtered()) %>%
+        req(input$simple_dropdown2)
+        memdata$myship = dplyr::filter(shipdata, SHIPNAME==input$simple_dropdown2) %>% slice_sample(n = 25)
+    })
+    observe({
+        req(memdata$myship)
+        leafletProxy(mapId = "mymap", data = memdata$myship) %>%
             clearMarkers() %>%   
-            addMarkers()
+            addCircleMarkers()
     })
 
 })
