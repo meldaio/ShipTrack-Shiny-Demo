@@ -1,5 +1,6 @@
 library(shiny)
 library(shiny.semantic)
+library(semantic.dashboard)
 library(leaflet)
 library(dplyr)
 
@@ -14,26 +15,63 @@ if (!exists("shipdata")){
     }
 }
 
-dropdownUI <- function(id,values){
+dropdownUI <- function(id,values) {
     dropdown_input(id, values, 
                    value = values[1], type = "search selection")
 }
 
+dropdownServer <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    selected_type <- reactiveValues( s = input$simple_dropdown1)
+    #a <- reactive({input$simple_dropdown1}) 
+    return(selected_type$s)
+    
+  })
+}
 ui <- shinyUI(semanticPage(
+    theme = "sandstone",
     header(title = "SHIP PROJECT", description = "Description", icon = "ship"),
+    flowLayout(
+      
+      box(width = 10,
+          color = "blue", ribbon = TRUE, 
+          column(width = 10,
+                 menu_header(icon("filter"), "SELECT A SHIP TYPE", is_item = FALSE),
+                 dropdownUI("simple_dropdown1",unique(shipdata$ship_type)),
+          )
+      ),
+      
+      box(width = 10,
+          color = "blue", ribbon = TRUE,
+          column(width = 10,
+                 menu_header(icon("search"), "SELECT A SHIP NAME", is_item = FALSE),
+                 uiOutput("simple_dropdown2")
+          )
+      ),
+      vertical_layout(
+      textOutput("selected1"),
+      theme_selector()
+      ),
+      cell_width = "250px",
+      column_gap = "12px"
+    ),
+    
     sidebar_layout(
+      
         sidebar_panel(
-            menu_header(icon("filter"), "SELECT A SHIP TYPE", is_item = FALSE),
-            dropdownUI("simple_dropdown1",unique(shipdata$ship_type)),
-            menu_header(icon("search"), "SELECT A SHIP NAME", is_item = FALSE),
-            uiOutput("simple_dropdown2"),
-            message_box(class = "blue", header = "Note", content = "text"),
-            width = 4),
+          message_box(class = "blue", header = "Note", content = "text"),
+          ##SECOND ARGUMENT WILL BE THE PLOT   
+          width = 4
+          ),
+        
         main_panel(
-            leafletOutput("mymap"),
-            width = 3
-        ),mirrored = TRUE
-    ),theme = "solar")
+          leafletOutput("mymap")
+        )
+        
+        ,mirrored = TRUE
+    )
+    #,theme = "solar"
+    )
 )
 
 server <- shinyServer(function(input, output) {
@@ -53,7 +91,7 @@ server <- shinyServer(function(input, output) {
     output$simple_dropdown2 = renderUI({
         shipnames <- dplyr::filter(shipdata, ship_type==input$simple_dropdown1)  %>% 
             select(SHIPNAME)  %>%  pull() %>%  unique()
-        dropdownUI("simple_dropdown2",shipnames)
+        dropdownUI("simple_dropdown2", shipnames)
     })
     
     df_filtered <- reactive({
@@ -64,7 +102,8 @@ server <- shinyServer(function(input, output) {
 
     observe({
         req(input$simple_dropdown2)
-        memdata$myship = dplyr::filter(shipdata, SHIPNAME==input$simple_dropdown2) %>% slice_sample(n = 25)
+        memdata$myship = dplyr::filter(shipdata, SHIPNAME==input$simple_dropdown2) %>% 
+          slice_sample(n = 25)
     })
     observe({
         req(memdata$myship)
@@ -72,6 +111,6 @@ server <- shinyServer(function(input, output) {
             clearMarkers() %>%   
             addCircleMarkers()
     })
-
+    output$selected1 <- renderText(paste(as.character(dropdownServer("simple_dropdown1")),"selected"))
 })
 shinyApp(ui, server)
