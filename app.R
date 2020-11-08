@@ -14,13 +14,20 @@ if (!exists("shipdata")){
     }
 }
 
+dropdownUI <- function(id,values){
+    dropdown_input(id, values, 
+                   value = values[1], type = "search selection")
+}
+
 ui <- shinyUI(semanticPage(
     header(title = "SHIP PROJECT", description = "Description", icon = "ship"),
     sidebar_layout(
         sidebar_panel(
-            dropdown_input("simple_dropdown1", unique(shipdata$ship_type), 
-                           value = shipdata$ship_type[1], type = "selection single"),
+            menu_header(icon("filter"), "SELECT A SHIP TYPE", is_item = FALSE),
+            dropdownUI("simple_dropdown1",unique(shipdata$ship_type)),
+            menu_header(icon("search"), "SELECT A SHIP NAME", is_item = FALSE),
             uiOutput("simple_dropdown2"),
+            message_box(class = "blue", header = "Note", content = "text"),
             width = 4),
         main_panel(
             leafletOutput("mymap"),
@@ -46,8 +53,7 @@ server <- shinyServer(function(input, output) {
     output$simple_dropdown2 = renderUI({
         shipnames <- dplyr::filter(shipdata, ship_type==input$simple_dropdown1)  %>% 
             select(SHIPNAME)  %>%  pull() %>%  unique()
-        dropdown_input("simple_dropdown2", shipnames, 
-                       value = shipnames[1], type = "selection single")
+        dropdownUI("simple_dropdown2",shipnames)
     })
     
     df_filtered <- reactive({
