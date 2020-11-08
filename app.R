@@ -7,7 +7,8 @@ memdata = reactiveValues(myship = NULL)
 
 if (!exists("shipdata")){
     if (!file.exists("ships.RData")) {
-        shipdata <- read.csv("ships.csv")
+        shipdata <- read.csv("ships.csv") %>% 
+            mutate(DATETIME=as.POSIXct(as.character(DATETIME)))     
         save(shipdata, file = "ships.RData")
     } else {
         load("ships.RData")
