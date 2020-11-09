@@ -15,14 +15,6 @@ dropdownUI <- function(id,values) {
                    value = values[1], type = "search selection")
 }
 
-dropdownServer <- function(id) {
-  moduleServer(id, function(input, output, session) {
-    selected_type <- reactiveValues( s = input$simple_dropdown1)
-    #a <- reactive({input$simple_dropdown1}) 
-    return(selected_type$s)
-    
-  })
-}
 ui <- shinyUI(semanticPage(
     theme = "sandstone",
     header(title = "SHIP PROJECT", description = "Description", icon = "ship"),
@@ -43,30 +35,16 @@ ui <- shinyUI(semanticPage(
                  uiOutput("simple_dropdown2")
           )
       ),
-      vertical_layout(
-      textOutput("selected1"),
-      theme_selector()
-      ),
-      cell_width = "250px",
-      column_gap = "12px"
+      uiOutput("message_box"),
+      cell_width = "270px",
+      column_gap = "20px"
     ),
-    
-    sidebar_layout(
-      
-        sidebar_panel(
-          message_box(class = "blue", header = "Note", content = "text"),
-          ##SECOND ARGUMENT WILL BE THE PLOT   
-          width = 4
-          ),
-        
-        main_panel(
+    flowLayout(
+      box(color = "blue", ribbon = FALSE,
           leafletOutput("mymap")
-        )
-        
-        ,mirrored = TRUE
+      ),cell_width = "850px"
     )
-    #,theme = "solar"
-    )
+)
 )
 
 server <- shinyServer(function(input, output) {
@@ -100,7 +78,13 @@ server <- shinyServer(function(input, output) {
             clearMarkers() %>%   
             addCircleMarkers()
     })
-    output$selected1 <- renderText(paste(as.character(dropdownServer("simple_dropdown1")),"selected"))
+    output$message_box = renderUI({
+      message_box(class = "blue",
+                  header = "Note",
+                  content = paste("Your choices -->",
+                                  "Ship Type:",input$simple_dropdown1,
+                                  "Ship Name:",input$simple_dropdown2))
+    })
 })
 
 shinyApp(ui, server)
