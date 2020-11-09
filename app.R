@@ -6,7 +6,7 @@ library(dplyr)
 
 source("processing.R")
 
-memdata = reactiveValues(myship = NULL,  shipdata_pr = NULL, mapcirclesize = 6)
+memdata = reactiveValues(myship = NULL,  shipdata_pr = NULL, mapcirclesize = 6, rowindex = NULL)
 
 if (!exists("shipdata")){
     shipdata <- load_raw_ship_data()
@@ -53,10 +53,11 @@ ui <- shinyUI(
             ), cell_width = "850px"
         ),
         flowLayout(
-            sliderInput("slid", label = "s", min = 1, max=199, value = 1),
+            uiOutput("numeric_input"),
+            #sliderInput("slid", label = "s", min = 1, max=199, value = 1),
             box(
                 tags$div("yo world"),
-                slider_input("slider_ex", 5, 0, 20, 1, class = "Labeled"),
+                #slider_input("slider_ex", 5, 0, 20, 1, class = "Labeled"),
             ), cell_width = "850px"
         ),
         dataTableOutput('table')
@@ -123,6 +124,13 @@ server <- shinyServer(function(input, output) {
     output$table <- renderDataTable({
         req(input$simple_dropdown2)
         memdata$shipdata_pr %>% filter(SHIPNAME==input$simple_dropdown2)
+    })
+#browser()
+    output$numeric_input <- renderUI({
+        req(input$simple_dropdown2)
+        x <- memdata$shipdata_pr %>% filter(SHIPNAME == input$simple_dropdown2)
+        memdata$rowindex <- which(shipdata$DATETIME == x$DATETIME & shipdata$SHIPNAME == x$SHIPNAME)
+        numeric_input("id","label", value = as.numeric(memdata$rowindex), min=1, max=length(shipdata$DATETIME))
     })
     exportTestValues(test_df = {shipdata})
 })
