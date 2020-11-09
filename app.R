@@ -89,12 +89,6 @@ server <- shinyServer(function(input, output) {
         dropdownUI("simple_dropdown2", shipnames)
     })
     
-    df_filtered <- reactive({
-        req(input$simple_dropdown2)
-        cbind(data[data$SHIPNAME == input$simple_dropdown2, ]$LAT[1], 
-              data[data$SHIPNAME == input$simple_dropdown2, ]$LON[1])
-    })
-
     observe({
         req(input$simple_dropdown2)
         memdata$myship = dplyr::filter(shipdata, SHIPNAME==input$simple_dropdown2) %>% 
