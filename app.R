@@ -35,26 +35,16 @@ ui <- shinyUI(semanticPage(
                  uiOutput("simple_dropdown2")
           )
       ),
-      cell_width = "250px",
-      column_gap = "12px"
+      uiOutput("message_box"),
+      cell_width = "270px",
+      column_gap = "20px"
     ),
-    
-    sidebar_layout(
-      
-        sidebar_panel(
-          message_box(class = "blue", header = "Note", content = "text"),
-          ##SECOND ARGUMENT WILL BE THE PLOT   
-          width = 4
-          ),
-        
-        main_panel(
+    flowLayout(
+      box(color = "blue", ribbon = FALSE,
           leafletOutput("mymap")
-        )
-        
-        ,mirrored = TRUE
+      ),cell_width = "850px"
     )
-    #,theme = "solar"
-    )
+)
 )
 
 server <- shinyServer(function(input, output) {
@@ -93,6 +83,13 @@ server <- shinyServer(function(input, output) {
         leafletProxy(mapId = "mymap", data = memdata$myship) %>%
             clearMarkers() %>%   
             addCircleMarkers()
+    })
+    output$message_box = renderUI({
+      message_box(class = "blue",
+                  header = "Note",
+                  content = paste("Your choices -->",
+                                  "Ship Type:",input$simple_dropdown1,
+                                  "Ship Name:",input$simple_dropdown2))
     })
 })
 
