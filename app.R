@@ -15,14 +15,6 @@ dropdownUI <- function(id,values) {
                    value = values[1], type = "search selection")
 }
 
-dropdownServer <- function(id) {
-  moduleServer(id, function(input, output, session) {
-    selected_type <- reactiveValues( s = input$simple_dropdown1)
-    #a <- reactive({input$simple_dropdown1}) 
-    return(selected_type$s)
-    
-  })
-}
 ui <- shinyUI(semanticPage(
     theme = "sandstone",
     header(title = "SHIP PROJECT", description = "Description", icon = "ship"),
@@ -42,10 +34,6 @@ ui <- shinyUI(semanticPage(
                  menu_header(icon("search"), "SELECT A SHIP NAME", is_item = FALSE),
                  uiOutput("simple_dropdown2")
           )
-      ),
-      vertical_layout(
-      textOutput("selected1"),
-      theme_selector()
       ),
       cell_width = "250px",
       column_gap = "12px"
@@ -106,7 +94,6 @@ server <- shinyServer(function(input, output) {
             clearMarkers() %>%   
             addCircleMarkers()
     })
-    output$selected1 <- renderText(paste(as.character(dropdownServer("simple_dropdown1")),"selected"))
 })
 
 shinyApp(ui, server)
