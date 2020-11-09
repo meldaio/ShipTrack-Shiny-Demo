@@ -60,7 +60,6 @@ server <- shinyServer(function(input, output) {
             #addMarkers(shipdata = cbind(shipdata$LAT[1], shipdata$LON[1]))
             addCircleMarkers(data = select(memdata$myship, LAT, LON))
     })
-    
     output$simple_dropdown2 = renderUI({
         shipnames <- dplyr::filter(shipdata, ship_type==input$simple_dropdown1)  %>% 
             select(SHIPNAME)  %>%  pull() %>%  unique()
@@ -71,8 +70,9 @@ server <- shinyServer(function(input, output) {
         req(input$simple_dropdown2)
         cbind(data[data$SHIPNAME == input$simple_dropdown2, ]$LAT[1], 
               data[data$SHIPNAME == input$simple_dropdown2, ]$LON[1])
+        input_list <<- c(input_list,input$simple_dropdown1)
     })
-
+    
     observe({
         req(input$simple_dropdown2)
         memdata$myship = dplyr::filter(shipdata, SHIPNAME==input$simple_dropdown2) %>% 
@@ -91,6 +91,7 @@ server <- shinyServer(function(input, output) {
                                   "Ship Type:",input$simple_dropdown1,
                                   "Ship Name:",input$simple_dropdown2))
     })
+    exportTestValues(test_df = {shipdata})
 })
 
 shinyApp(ui, server)
