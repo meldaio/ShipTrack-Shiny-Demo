@@ -202,7 +202,7 @@ server <- shinyServer(function(input, output) {
         )
     })
     
-    exportTestValues(test_df = {shipdata},
+    exportTestValues(test_df = {memdata$shipdata_pr},
                      test_processed_df = load_processed_ship_data())
 })
 
