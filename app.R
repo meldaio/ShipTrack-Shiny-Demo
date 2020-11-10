@@ -133,7 +133,8 @@ server <- shinyServer(function(input, output) {
         #numeric_input("id","label", value = as.numeric(memdata$rowindex), min=1, max=length(shipdata$DATETIME))
         shiny::sliderInput("inputId", label="label",min=1, max=length(shipdata$DATETIME), value=as.numeric(memdata$rowindex))
     })
-    exportTestValues(test_df = {shipdata})
+    exportTestValues(test_df = {shipdata},
+                     test_processed_df = load_processed_ship_data())
 })
 
 shinyApp(ui, server)
