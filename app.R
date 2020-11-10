@@ -26,7 +26,7 @@ dropdownUI <- function(id,values) {
 ui <- shinyUI(
     semanticPage(
         theme = "sandstone",
-        header(title = "SHIP PROJECT", description = "Description", icon = "ship"),
+        header(title = "SHIP PROJECT", description = NULL, icon = "ship"),
         flowLayout(
             box(color = "blue", 
                        menu_header(icon("filter"), "SELECT A SHIP TYPE", is_item = FALSE),
