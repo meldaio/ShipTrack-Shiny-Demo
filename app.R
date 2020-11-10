@@ -143,7 +143,8 @@ server <- shinyServer(function(input, output) {
                            max = tail((memdata$myshipraw$DATETIME),1),
                            value = (memdata$myshipraw$DATETIME[memdata$rowindex]))
     })
-    #exportTestValues(test_df = {shipdata})
+    exportTestValues(test_df = {shipdata},
+                     test_processed_df = load_processed_ship_data())
 })
 
 shinyApp(ui, server)
