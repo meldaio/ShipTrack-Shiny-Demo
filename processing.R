@@ -11,9 +11,9 @@ load_raw_ship_data <- function(){
   db <- getDBConnection()
   
   if ((length(dbListTables(db))==0)) {
-    print("Reading raw ship data from csv file and creating SQLite DB with it")
+    print("Reading raw ship data from .rds file and creating SQLite DB with it")
     start_time <- Sys.time()
-    shipdata <- read_csv("ships.csv") #%>% mutate(DATETIME=as.POSIXct(as.character(DATETIME)))
+    shipdata <- readRDS("ships.rds") #%>% mutate(DATETIME=as.POSIXct(as.character(DATETIME)))
     end_time <- Sys.time()
     print(difftime(end_time, start_time, units="mins"))
     
