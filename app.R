@@ -3,19 +3,18 @@ library(shiny.semantic)
 library(semantic.dashboard)
 library(leaflet)
 library(dplyr)
+library(RSQLite)
+library(dbplyr)
 
 source("processing.R")
 
-memdata = reactiveValues(myship = NULL,  shipdata_pr = NULL, mapcirclesize = 6, rowindex = NULL)
+memdata = reactiveValues(shipmeta = NULL, myshipraw = NULL,  shipdata_pr = NULL, 
+                         mapcirclesize = 6, rowindex = NULL)
 
-if (!exists("shipdata")){
-    shipdata <- load_raw_ship_data()
-    print("yo")
-}
-if (!exists("shipdata_pr")){
-    memdata$shipdata_pr <- load_processed_ship_data()
-    print("yo2")
-}
+print("Reading ship metadata off disk")
+memdata$shipmeta <- load_shipmeta()
+print("Reading processed ship data off disk")
+memdata$shipdata_pr <- load_processed_ship_data()
 
 dropdownUI <- function(id,values) {
     dropdown_input(id, values, 
@@ -23,19 +22,19 @@ dropdownUI <- function(id,values) {
 }
 
 ui <- shinyUI(
-    semanticPage(
+     semanticPage(
         theme = "sandstone",
         header(title = "SHIP PROJECT", description = "Description", icon = "ship"),
         flowLayout(
-            
+
             box(width = 10,
-                color = "blue", ribbon = TRUE, 
-                column(width = 10,
-                       menu_header(icon("filter"), "SELECT A SHIP TYPE", is_item = FALSE),
-                       dropdownUI("simple_dropdown1",unique(shipdata$ship_type)),
-                )
+                color = "blue", ribbon = TRUE,
+                    column(width = 10,
+                            menu_header(icon("filter"), "SELECT A SHIP TYPE", is_item = FALSE),
+                           uiOutput("simple_dropdown1")
+                    )
             ),
-            
+
             box(width = 10,
                 color = "blue", ribbon = TRUE,
                 column(width = 10,
@@ -46,7 +45,7 @@ ui <- shinyUI(
             uiOutput("message_box"),
             cell_width = "270px",
             column_gap = "20px"
-        ),
+         ),
         flowLayout(
             box(color = "blue", ribbon = FALSE,
                 leafletOutput("mymap")
@@ -54,10 +53,9 @@ ui <- shinyUI(
         ),
         flowLayout(
             uiOutput("numeric_input"),
-            #sliderInput("slid", label = "s", min = 1, max=199, value = 1),
+            sliderInput("slid", label = "s", min = 1, max=199, value = 1),
             box(
                 tags$div("yo world"),
-                #slider_input("slider_ex", 5, 0, 20, 1, class = "Labeled"),
             ), cell_width = "850px"
         ),
         dataTableOutput('table')
@@ -67,73 +65,85 @@ ui <- shinyUI(
 server <- shinyServer(function(input, output) {
     
     output$mymap <- renderLeaflet({
-        req(memdata$myship)
-        
+        req(memdata$myshipraw)
+
         leaflet() %>%
             addProviderTiles(providers$Stamen.TonerLite,
-                             options = providerTileOptions(noWrap = TRUE)
-            ) %>%
-            #setView(lng = shipdata$LON[1],lat = shipdata$LAT[1], zoom = 10) %>%
-            #addMarkers(shipdata = cbind(shipdata$LAT[1], shipdata$LON[1]))
-            addCircleMarkers(data = memdata$myship %>% select(LAT, LON))
+                             options = providerTileOptions(noWrap = TRUE)) %>%
+            addCircleMarkers(data = memdata$myshipraw %>% select(LAT, LON))
     })
+    
+    output$simple_dropdown1 <- renderUI({
+        dropdownUI("simple_dropdown1", memdata$shipmeta$shiptypes_unique %>% pull())
+    })
+    
     output$simple_dropdown2 = renderUI({
-        shipnames <- dplyr::filter(shipdata, ship_type==input$simple_dropdown1)  %>% 
-            select(SHIPNAME)  %>%  pull() %>%  unique()
-        dropdownUI("simple_dropdown2", shipnames)
+        dropdownUI("simple_dropdown2", memdata$shipmeta$shipnames_unique %>% pull())
+    })
+
+    observe({
+        req(input$simple_dropdown2)
+
+        db <- getDBConnection()
+        selected_shipname <- input$simple_dropdown2 
+        memdata$myshipraw <- db %>% tbl("shipdataraw") %>% filter(SHIPNAME==selected_shipname) %>% as_tibble()
+        #slice_sample(n = 100)
+        dbDisconnect(db)
     })
     
     observe({
-        req(input$simple_dropdown2)
-        memdata$myship = dplyr::filter(shipdata, SHIPNAME==input$simple_dropdown2) #%>% 
-            #slice_sample(n = 100)
-    })
-    observe({
-        req(memdata$myship)
-        
-        highspeed <- memdata$shipdata_pr %>% 
+        req(memdata$myshipraw)
+
+        highspeed <- memdata$shipdata_pr %>%
             filter(SHIPNAME==input$simple_dropdown2)
-#browser()
-        leafletProxy(mapId = "mymap", data = memdata$myship) %>%
-            clearMarkers() %>%   
+
+        leafletProxy(mapId = "mymap", data = memdata$myshipraw) %>%
+            clearMarkers() %>%
             addCircleMarkers(radius = memdata$mapcirclesize,
                              stroke = FALSE,
                              fillOpacity = 0.2,
-                             group = "Raw data") %>% 
+                             group = "Raw data") %>%
             addCircleMarkers(data = highspeed[c("LON","LAT")],
                              group = "Highest Speed : End",
-                             color = "#FF0000") %>% 
+                             color = "#FF0000") %>%
             addCircleMarkers(lng = highspeed$LON_prev, lat = highspeed$LAT_prev,
                              group = "Highest Speed : Start",
-                             color = "#00FF00") %>% 
+                             color = "#00FF00") %>%
             addLayersControl(
                 #baseGroups = c("OSM (default)", "Toner", "Toner Lite"),
                 overlayGroups = c("Raw data", "Highest Speed : Start", "Highest Speed : End"),
                 options = layersControlOptions(collapsed = FALSE)
             )
     })
-    
+
     output$message_box = renderUI({
+        req(input$simple_dropdown2)
+
         message_box(class = "blue",
                     header = "Note",
                     content = paste("Your choices -->",
-                                    "Ship Type:",input$simple_dropdown1,
-                                    "Ship Name:",input$simple_dropdown2))
+                                    "Ship Type:", isolate(input$simple_dropdown1),
+                                    "Ship Name:", input$simple_dropdown2))
     })
-    
+
     output$table <- renderDataTable({
-        req(input$simple_dropdown2)
-        memdata$shipdata_pr %>% filter(SHIPNAME==input$simple_dropdown2)
+        req(memdata$rowindex)
+        #memdata$shipdata_pr %>% filter(SHIPNAME==input$simple_dropdown2)
+        display_idx = seq(memdata$rowindex-2, length.out = 5)
+        memdata$myshipraw[display_idx,] %>% select(LAT,LON,SPEED,COURSE,HEADING,DATETIME,is_parked)
     })
-#browser()
+
     output$numeric_input <- renderUI({
         req(input$simple_dropdown2)
+        req(memdata$myshipraw$DATETIME)
+        
         x <- memdata$shipdata_pr %>% filter(SHIPNAME == input$simple_dropdown2)
-        memdata$rowindex <- which(shipdata$DATETIME == x$DATETIME & shipdata$SHIPNAME == x$SHIPNAME)
-        #numeric_input("id","label", value = as.numeric(memdata$rowindex), min=1, max=length(shipdata$DATETIME))
-        shiny::sliderInput("inputId", label="label",min=1, max=length(shipdata$DATETIME), value=as.numeric(memdata$rowindex))
+        memdata$rowindex <- which(memdata$myshipraw$DATETIME == x$DATETIME & memdata$myshipraw$SHIPNAME == x$SHIPNAME)
+        shiny::sliderInput("inputId", label = "label", min = (memdata$myshipraw$DATETIME[1]),
+                           max = tail((memdata$myshipraw$DATETIME),1),
+                           value = (memdata$myshipraw$DATETIME[memdata$rowindex]))
     })
-    exportTestValues(test_df = {shipdata})
+    #exportTestValues(test_df = {shipdata})
 })
 
 shinyApp(ui, server)
