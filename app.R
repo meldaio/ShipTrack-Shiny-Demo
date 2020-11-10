@@ -5,10 +5,12 @@ library(leaflet)
 library(dplyr)
 library(RSQLite)
 library(dbplyr)
+library(DT)
 
 source("processing.R")
 
-memdata = reactiveValues(shipmeta = NULL, myshipraw = NULL,  shipdata_pr = NULL, 
+memdata = reactiveValues(shipmeta = NULL, shipdetails = NULL, 
+                         myshipraw = NULL,  shipdata_pr = NULL, 
                          mapcirclesize = 6, rowindex = NULL)
 
 print("Reading ship metadata off disk")
@@ -24,44 +26,42 @@ dropdownUI <- function(id,values) {
 ui <- shinyUI(
      semanticPage(
         theme = "sandstone",
-        header(title = "SHIP PROJECT", description = "Description", icon = "ship"),
+        header(title = "SHIP PROJECT", description = NULL, icon = "ship"),
         flowLayout(
-
-            box(width = 10,
-                color = "blue", ribbon = TRUE,
-                    column(width = 10,
-                            menu_header(icon("filter"), "SELECT A SHIP TYPE", is_item = FALSE),
-                           uiOutput("simple_dropdown1")
-                    )
+            box(color = "blue",
+                menu_header(icon("filter"), "SELECT A SHIP TYPE", is_item = FALSE),
+                uiOutput("simple_dropdown1")
             ),
-
-            box(width = 10,
-                color = "blue", ribbon = TRUE,
-                column(width = 10,
-                       menu_header(icon("search"), "SELECT A SHIP NAME", is_item = FALSE),
-                       uiOutput("simple_dropdown2")
-                )
+            box(color = "blue",
+                menu_header(icon("search"), "SELECT A SHIP NAME", is_item = FALSE),
+                uiOutput("simple_dropdown2")
             ),
-            uiOutput("message_box"),
-            cell_width = "270px",
+            cell_width = "48%",
             column_gap = "20px"
-         ),
+        ),
         
-        flowLayout(
-            box(color = "blue", ribbon = FALSE,
-                leafletOutput("mymap")
-            ), cell_width = "850px"
+        sidebar_layout(
+            sidebar_panel(width = 3,
+                          box(color = "blue",
+                          uiOutput("information"), tags$br(),
+                          uiOutput("message_box"),
+                ),
+            ), 
+            main_panel(width = 6,
+                box(color = "blue", ribbon = FALSE,
+                    leafletOutput("mymap")
+                )
+            )
         ),
         flowLayout(
-            uiOutput("numeric_input"),
-            #sliderInput("slid", label = "s", min = 1, max=199, value = 1),
-            box(
-                tags$div("yo world"),
-                #slider_input("slider_ex", 5, 0, 20, 1, class = "Labeled"),
-            ), cell_width = "850px"
-        ),
-        dataTableOutput('table')
-     )
+            box(color = "blue",
+                action_button("eval","Show Processed Dataset",icon("down arrow icon"),class="blue"),
+                conditionalPanel("input.eval && !output.hide_panel", 
+                                 uiOutput("table_output")
+                ),
+            ), cell_width = NULL
+        )
+    )
 )
 
 server <- shinyServer(function(input, output) {
@@ -76,20 +76,27 @@ server <- shinyServer(function(input, output) {
     })
     
     output$simple_dropdown1 <- renderUI({
-        dropdownUI("simple_dropdown1", memdata$shipmeta$shiptypes_unique %>% pull())
+        isolate({
+            shiptypes = unique(memdata$shipmeta$ship_type)
+        })
+        dropdownUI("simple_dropdown1", shiptypes)
     })
     
     output$simple_dropdown2 = renderUI({
-        dropdownUI("simple_dropdown2", memdata$shipmeta$shipnames_unique %>% pull())
+        req(input$simple_dropdown1)
+
+        isolate({
+            shipnames = memdata$shipmeta %>% filter(ship_type==input$simple_dropdown1) %>% select(SHIPNAME) %>% pull()
+        })
+        dropdownUI("simple_dropdown2", shipnames)
     })
 
     observe({
         req(input$simple_dropdown2)
-
+        
         db <- getDBConnection()
         selected_shipname <- input$simple_dropdown2 
         memdata$myshipraw <- db %>% tbl("shipdataraw") %>% filter(SHIPNAME==selected_shipname) %>% as_tibble()
-        #slice_sample(n = 100)
         dbDisconnect(db)
     })
     
@@ -112,39 +119,89 @@ server <- shinyServer(function(input, output) {
                              group = "Highest Speed : Start",
                              color = "#00FF00") %>%
             addLayersControl(
-                #baseGroups = c("OSM (default)", "Toner", "Toner Lite"),
                 overlayGroups = c("Raw data", "Highest Speed : Start", "Highest Speed : End"),
                 options = layersControlOptions(collapsed = FALSE)
             )
     })
 
-    output$message_box = renderUI({
+    observe({
         req(input$simple_dropdown2)
-
-        message_box(class = "blue",
-                    header = "Note",
-                    content = paste("Your choices -->",
-                                    "Ship Type:", isolate(input$simple_dropdown1),
-                                    "Ship Name:", input$simple_dropdown2))
-    })
-
-    output$table <- renderDataTable({
-        req(memdata$rowindex)
-        #memdata$shipdata_pr %>% filter(SHIPNAME==input$simple_dropdown2)
-        display_idx = seq(memdata$rowindex-2, length.out = 5)
-        memdata$myshipraw[display_idx,] %>% select(LAT,LON,SPEED,COURSE,HEADING,DATETIME,is_parked)
-    })
-
-    output$numeric_input <- renderUI({
-        req(input$simple_dropdown2)
-        req(memdata$myshipraw$DATETIME)
+        x <- memdata$shipdata_pr %>% filter(SHIPNAME == input$simple_dropdown2)
         
+        output$message_box = renderUI({
+            message_box(class = "blue",
+                        header = NULL,
+                        content = paste("The longest distance between two consecutive observations is",
+                                        round(as.numeric(x$dist2prev)),"meters. They are ",
+                                        round(abs(as.numeric(x$DATETIME_diff)/60)),
+                                        "minutes apart in time."
+                        )
+            )
+        })
+        
+    })
+    
+    output$table_output <- renderUI({
+        dataTableOutput('table')
+    })
+
+    output$table <- DT::renderDataTable({
+        req(input$simple_dropdown2)
+        
+        row_idx = seq(memdata$rowindex-2, length.out = 5)
+        inDF = memdata$myshipraw[row_idx,] %>% 
+            select(-c(COURSE,ELAPSED,LENGTH,ROT,SHIPTYPE,SHIP_ID,WIDTH,L_FORE,W_LEFT,DWT,GT_SHIPTYPE,LEGEND))
+        inDF$DATETIME = as.POSIXct(inDF$DATETIME, origin = "1970-01-01")
+        datatable(inDF%>% mutate_if(is.numeric, round), options = list(dom = 't'))
+    })
+
+    observe({
+        req(input$simple_dropdown2)
         x <- memdata$shipdata_pr %>% filter(SHIPNAME == input$simple_dropdown2)
         memdata$rowindex <- which(memdata$myshipraw$DATETIME == x$DATETIME & memdata$myshipraw$SHIPNAME == x$SHIPNAME)
-        shiny::sliderInput("inputId", label = "label", min = (memdata$myshipraw$DATETIME[1]),
-                           max = tail((memdata$myshipraw$DATETIME),1),
-                           value = (memdata$myshipraw$DATETIME[memdata$rowindex]))
+
+        #take the most recent if there are two observations found
+        isolate(memdata$rowindex <- tail(memdata$rowindex,1))
+    })    
+
+    output$hide_panel <- eventReactive(input$num_input, TRUE, ignoreInit = TRUE)
+    
+    outputOptions(output, "hide_panel", suspendWhenHidden = FALSE)
+    
+    observe({
+        req(memdata$myshipraw)
+        req(memdata$rowindex)
+
+        memdata$shipdetails = list()
+            isolate({
+                memdata$shipdetails$ship_length <- unique(memdata$myshipraw$LENGTH)
+                memdata$shipdetails$ship_width <- unique(memdata$myshipraw$WIDTH)
+                memdata$shipdetails$ship_port <- unique(memdata$myshipraw$PORT[1])
+                memdata$shipdetails$ship_destination <- unique(memdata$myshipraw$PORT[2])
+                memdata$shipdetails$ship_speed <- unique(memdata$myshipraw$SPEED[memdata$rowindex])
+                memdata$shipdetails$ship_flag <- unique(memdata$myshipraw$FLAG)
+            })
     })
+        
+    output$information <- renderUI({
+        req(memdata$shipdetails)
+        req(input$simple_dropdown1)
+
+        isolate(
+            message_box(header = paste("Ship Name:",input$simple_dropdown2),
+                        class = "list message",
+                        content = c(paste("Ship Type:",input$simple_dropdown1),
+                                    paste("Length:", memdata$shipdetails$ship_length[1], "meters"),
+                                    paste("Width:", memdata$shipdetails$ship_width[1], "meters"),
+                                    paste ("Current Port:", memdata$shipdetails$ship_port[1]),                                
+                                    paste("Destination:", memdata$shipdetails$ship_destination[1]),
+                                    paste ("Speed:", memdata$shipdetails$ship_speed[1]),
+                                    paste("Flag:", memdata$shipdetails$ship_flag[1])
+                        )
+            )            
+        )
+    })
+    
     exportTestValues(test_df = {shipdata},
                      test_processed_df = load_processed_ship_data())
 })

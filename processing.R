@@ -10,7 +10,7 @@ load_raw_ship_data <- function(){
   
   db <- getDBConnection()
   
-  if ((length(dbListTables(db)==0))) {
+  if ((length(dbListTables(db))==0)) {
     print("Reading raw ship data from csv file and creating SQLite DB with it")
     start_time <- Sys.time()
     shipdata <- read_csv("ships.csv") #%>% mutate(DATETIME=as.POSIXct(as.character(DATETIME)))
@@ -33,15 +33,14 @@ load_raw_ship_data <- function(){
 
 load_shipmeta <- function(){
   if (!file.exists("shipmeta.rds")) {
-    df <- load_raw_ship_data(db)
+    df1 <- load_raw_ship_data()
     
-    out = list()
-    out$shipnames_unique <- 
-      df %>% select(SHIPNAME, ship_type) %>% distinct(SHIPNAME)
-    out$shiptypes_unique <- 
-      df %>% select(SHIPNAME, ship_type) %>% distinct(ship_type)
+    shipnames_unique <- unique(df1 %>% select(SHIPNAME, ship_type))
+    #   df1 %>% select(SHIPNAME, ship_type) %>% distinct(SHIPNAME)
+    # out$shiptypes_unique <- 
+    #   df1 %>% select(SHIPNAME, ship_type) %>% distinct(ship_type)
   
-    saveRDS(out, file = "shipmeta.rds")
+    saveRDS(shipnames_unique, file = "shipmeta.rds")
   } else {
     out = readRDS("shipmeta.rds")
   }
