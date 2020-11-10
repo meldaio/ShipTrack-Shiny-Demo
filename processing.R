@@ -80,7 +80,6 @@ process_raw_ship_data <- function(shipdata){
 
 load_processed_ship_data <- function(){
   if (!file.exists("ships_processed.rds")) {
-    #shipdataP <- read_csv("ships.csv")  #%>% mutate(DATETIME=as.POSIXct(as.character(DATETIME)))
     shipdata <- load_raw_ship_data()
     shipdataP <- process_raw_ship_data(shipdata)
     saveRDS(shipdataP, file = "ships_processed.rds")

@@ -123,7 +123,7 @@ server <- shinyServer(function(input, output) {
                 options = layersControlOptions(collapsed = FALSE)
             )
     })
-
+    
     observe({
         req(input$simple_dropdown2)
         x <- memdata$shipdata_pr %>% filter(SHIPNAME == input$simple_dropdown2)
