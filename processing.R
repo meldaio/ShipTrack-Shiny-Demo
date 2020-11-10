@@ -10,7 +10,7 @@ load_raw_ship_data <- function(){
   
   db <- getDBConnection()
   
-  if (!file.exists("ships.rds")) {
+  if ((length(dbListTables(db)==0))) {
     print("Reading raw ship data from csv file and creating SQLite DB with it")
     start_time <- Sys.time()
     shipdata <- read_csv("ships.csv") #%>% mutate(DATETIME=as.POSIXct(as.character(DATETIME)))
