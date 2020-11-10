@@ -56,6 +56,7 @@ process_raw_ship_data <- function(shipdata){
   #my_ship = shipdata %>% group_by(SHIPNAME) %>% tally(sort = T) %>% select(SHIPNAME) %>% pull() %>% as.character() %>% head(8)
   
   start_time <- Sys.time()
+
   sd1 <- shipdata %>% 
     #filter(SHIPNAME %in% my_ship) %>%
     group_by(SHIPNAME) %>% 

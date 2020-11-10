@@ -46,6 +46,7 @@ ui <- shinyUI(
             cell_width = "270px",
             column_gap = "20px"
          ),
+        
         flowLayout(
             box(color = "blue", ribbon = FALSE,
                 leafletOutput("mymap")
@@ -53,13 +54,14 @@ ui <- shinyUI(
         ),
         flowLayout(
             uiOutput("numeric_input"),
-            sliderInput("slid", label = "s", min = 1, max=199, value = 1),
+            #sliderInput("slid", label = "s", min = 1, max=199, value = 1),
             box(
                 tags$div("yo world"),
+                #slider_input("slider_ex", 5, 0, 20, 1, class = "Labeled"),
             ), cell_width = "850px"
         ),
         dataTableOutput('table')
-    )
+     )
 )
 
 server <- shinyServer(function(input, output) {
